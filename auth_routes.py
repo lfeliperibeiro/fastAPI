@@ -9,12 +9,16 @@ from datetime import datetime, timedelta, timezone
 
 auth_router  = APIRouter(prefix="/auth", tags=["auth"])
 
-def create_token(user_id: str):
-    expiration_date = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+def create_token(user_id: str, duration= timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
+    expiration_date = datetime.now(timezone.utc) + duration
     info_dict = {"sub": user_id, "exp": expiration_date}
     encoding_jwt = jwt.encode(info_dict, SECRET_KEY, algorithm=ALGORITHM)
     token = encoding_jwt
     return token
+
+def verify_token(token: str, session: Session = Depends(get_session)):
+    user = session.query(User).filter(User.id == 1).first()
+    return user
 
 def user_authentication(email: str, password: str, session: Session):
     user = session.query(User).filter(User.email == email).first()
@@ -54,5 +58,15 @@ async def login(login_schema: loginSchema, session: Session = Depends(get_sessio
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     else:
         access_token = create_token(user.id)
-        return {"access_token": access_token, "token_type": "Bearer"}
+        refresh_token = create_token(user.id, timedelta(days=7))
+        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
+
+
+@auth_router.post("/refresh")
+
+async def use_refresh_token(refresh_token: str):
+    user = verify_token(refresh_token)
+    access_token = create_token(user.id)
+
+    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 
