@@ -1,6 +1,24 @@
 from fastapi import FastAPI
+from dotenv import load_dotenv
+import os
+import bcrypt
+
+load_dotenv()
+
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 app = FastAPI()
+
+class BcryptContext:
+    def hash(self, password: str) -> str:
+        pwd_bytes = password.encode('utf-8')[:72]
+        return bcrypt.hashpw(pwd_bytes, bcrypt.gensalt()).decode('utf-8')
+
+    def verify(self, plain_password: str, hashed_password: str) -> bool:
+        pwd_bytes = plain_password.encode('utf-8')[:72]
+        return bcrypt.checkpw(pwd_bytes, hashed_password.encode('utf-8'))
+
+bcrypt_context = BcryptContext()
 
 from auth_routes import auth_router
 from order_routes import order_router

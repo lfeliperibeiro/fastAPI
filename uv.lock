@@ -294,6 +294,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
+    { name = "bcrypt" },
     { name = "fastapi" },
     { name = "passlib", extra = ["bcrypt"] },
     { name = "python-dotenv" },
@@ -313,6 +314,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.18.4" },
+    { name = "bcrypt", specifier = ">=5.0.0" },
     { name = "fastapi", specifier = ">=0.135.1" },
     { name = "passlib", extras = ["bcrypt"], specifier = ">=1.7.4" },
     { name = "python-dotenv", specifier = ">=1.2.2" },
