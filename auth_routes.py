@@ -1,24 +1,23 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models import User
-from dependencies import get_session
+from dependencies import get_session, verify_token
 from main import bcrypt_context, ALGORITHM, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
 from schemas import userSchema, loginSchema
 from sqlalchemy.orm import Session
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
+from fastapi.security import OAuth2PasswordRequestForm
 
 auth_router  = APIRouter(prefix="/auth", tags=["auth"])
 
 def create_token(user_id: str, duration= timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
     expiration_date = datetime.now(timezone.utc) + duration
-    info_dict = {"sub": user_id, "exp": expiration_date}
+    info_dict = {"sub": str(user_id), "exp": expiration_date}
     encoding_jwt = jwt.encode(info_dict, SECRET_KEY, algorithm=ALGORITHM)
     token = encoding_jwt
     return token
 
-def verify_token(token: str, session: Session = Depends(get_session)):
-    user = session.query(User).filter(User.id == 1).first()
-    return user
+
 
 def user_authentication(email: str, password: str, session: Session):
     user = session.query(User).filter(User.email == email).first()
@@ -62,11 +61,20 @@ async def login(login_schema: loginSchema, session: Session = Depends(get_sessio
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 
 
+@auth_router.post("/login-test")
+async def login_test(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+    user = user_authentication(form_data.username, form_data.password, session)
+    if not user:
+        raise HTTPException(status_code=400, detail="user not found or invalid credentials")
+    else:
+        access_token = create_token(user.id)
+        return {"access_token": access_token, "token_type": "Bearer"}
+
+
 @auth_router.post("/refresh")
 
-async def use_refresh_token(refresh_token: str):
-    user = verify_token(refresh_token)
+async def use_refresh_token(user: User = Depends(verify_token)):
     access_token = create_token(user.id)
 
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
+    return {"access_token": access_token, "token_type": "Bearer"}
 
