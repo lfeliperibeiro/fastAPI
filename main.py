@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.security import OAuth2PasswordBearer
 from dotenv import load_dotenv
 import os
 import bcrypt
@@ -21,6 +22,7 @@ class BcryptContext:
         return bcrypt.checkpw(pwd_bytes, hashed_password.encode('utf-8'))
 
 bcrypt_context = BcryptContext()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login-test")
 
 from auth_routes import auth_router
 from order_routes import order_router
