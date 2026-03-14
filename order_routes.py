@@ -79,3 +79,29 @@ async def add_product_to_order(order_id: int,
         "price": product.price,
         "total_price": order.price
         }
+
+@order_router.post("/order/remove_product/{product_id}")
+
+async def remove_product_from_order(product_id: int,
+                                   session: Session = Depends(get_session),
+                                   user: User = Depends(verify_token)):
+    product = session.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    order = session.query(Order).filter(Order.id == product.order).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not user.admin and user.id != order.user:
+        raise HTTPException(status_code=403, detail="You do not have permission to remove products from this order")
+
+    session.delete(product)
+    order.calculate_price()
+    session.commit()
+
+    return {
+        "message": f"Product removed successfully from order id: {order.id}",
+        "quantity": len(order.items),
+        "order": order.items,
+    }
