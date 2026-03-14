@@ -1,61 +1,78 @@
 # FastAPI Example
 
-API simples utilizando FastAPI, SQLAlchemy e Alembic.
+Projeto de exemplo com **FastAPI**, **SQLAlchemy**, **Alembic** e autenticação JWT.
 
-## Funcionalidades principais
+## ✅ Funcionalidades principais
 
-- Criação de usuário (signup)
+- Cadastro de usuário (signup)
 - Login com JWT (access + refresh tokens)
-- Rotas protegidas via token (você precisa estar autenticado para acessar)
-- CRUD de pedidos (apenas admins podem ver todos os pedidos)
-- Cancelamento de pedidos (admins ou dono do pedido)
-- Adição de produtos a um pedido (admins ou dono do pedido)
+- Rotas protegidas por token (Bearer)
+- CRUD simples de pedidos / produtos (com permissões de admin)
+- Cancelamento e finalização de pedidos
 
-## Dependências
+## 🚀 Preparando o ambiente
 
-As dependências são gerenciadas via `pyproject.toml` (PEP 621). O projeto usa:
-
-- FastAPI
-- SQLAlchemy
-- Alembic
-- Passlib + bcrypt
-- python-jose (JWT)
-- python-dotenv
-
-## Rodando localmente
-
-1) Ative o ambiente virtual (supondo que você use um `.venv`):
+### 1) Crie/ative um ambiente virtual
 
 ```bash
+python -m venv .venv
 source .venv/bin/activate.fish
 ```
 
-2) Instale dependências (se ainda não estiverem instaladas):
+### 2) Instale as dependências
 
 ```bash
-pip install -r requirements.txt
+python -m pip install -e .
 ```
 
-3) Execute a aplicação:
+Para instalar também as dependências de desenvolvimento (testes):
 
 ```bash
-uvicorn main:app --reload
+python -m pip install -e .[dev]
 ```
 
+### 3) Configure variáveis de ambiente
 
-Alternativa (com o utilitário `uv`):
+Copie o arquivo de exemplo e preencha os valores:
 
 ```bash
- uv run uvicorn main:app --reload
- ```
+cp .env.example .env
+```
 
+Edite `.env` e defina pelo menos:
 
-4) Acesse a documentação automática:
+- `SECRET_KEY` (valor aleatório)
+- `ALGORITHM` (ex: `HS256`)
+- `ACCESS_TOKEN_EXPIRE_MINUTES` (ex: `120`)
+
+### 4) Migre o banco de dados (SQLite)
+
+O projeto usa SQLite (`banco.db` por padrão).
+
+```bash
+alembic upgrade head
+```
+
+### 5) Execute a aplicação
+
+```bash
+python -m uvicorn main:app --reload
+```
+
+Ou, se usar o utilitário `uv`:
+
+```bash
+uv run uvicorn main:app --reload
+```
+
+### 6) Acesse a documentação automática
 
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
 
-## Rotas principais
+---
+
+## 🔌 Principais rotas (API)
 
 ### Autenticação
 
@@ -78,19 +95,42 @@ Body de exemplo (JSON):
 #### `POST /auth/login`
 Faz login com email + senha e retorna `access_token` e `refresh_token`.
 
-#### `POST /auth/refresh`
-Renova o token (precisa enviar o refresh token).
+Body de exemplo (JSON):
 
+```json
+{
+  "email": "usuario@exemplo.com",
+  "password": "senha123"
+}
+```
+
+#### `POST /auth/login-test`
+Login via fluxo OAuth2 (form data). Útil para testar `OAuth2PasswordRequestForm`.
+
+#### `POST /auth/refresh`
+Renova o token de acesso. Requer enviar o token de refresh no cabeçalho `Authorization: Bearer <refresh_token>`.
+
+---
 
 ### Pedidos (requere autenticação)
 
-Todas as rotas abaixo exigem que você envie o cabeçalho `Authorization: Bearer <token>`.
+Para todas as rotas abaixo, envie o cabeçalho:
+
+```
+Authorization: Bearer <access_token>
+```
 
 #### `GET /orders/`
-Retorna um placeholder (ainda não implementado para listar pedidos reais).
+Retorna um placeholder (a rota ainda não lista pedidos reais).
+
+#### `GET /orders/list` (admin)
+Retorna todos os pedidos (apenas usuários admin têm acesso).
+
+#### `GET /orders/order/{order_id}`
+Retorna detalhes de um pedido (admin ou dono do pedido).
 
 #### `POST /orders/order`
-Cria um pedido para o usuário indicado.
+Cria um pedido para um usuário.
 
 Body (JSON):
 
@@ -101,10 +141,13 @@ Body (JSON):
 ```
 
 #### `POST /orders/order/cancel/{order_id}`
-Cancela um pedido. Só o admin ou o dono do pedido podem cancelar.
+Cancela um pedido (admin ou dono do pedido).
+
+#### `POST /orders/order/finished/{order_id}`
+Marca um pedido como finalizado (admin ou dono do pedido).
 
 #### `POST /orders/order/add_product/{order_id}`
-Adiciona um produto a um pedido.
+Adiciona um produto ao pedido.
 
 Body (JSON):
 
@@ -117,12 +160,16 @@ Body (JSON):
 }
 ```
 
-## Banco de dados
+#### `POST /orders/order/remove_product/{product_id}`
+Remove um produto de um pedido (admin ou dono do pedido).
 
-O projeto usa SQLite (`banco.db` por padrão). Para gerar migrações com Alembic:
+---
+
+## 🧪 Testes
+
+Execute o conjunto de testes com:
 
 ```bash
-alembic revision --autogenerate -m "mensagem"
-alembic upgrade head
+pytest
 ```
 
