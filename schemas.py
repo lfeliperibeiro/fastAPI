@@ -34,3 +34,12 @@ class OrderProductSchema(BaseModel):
 
       class Config:
           from_attributes = True
+
+class ResponseOrderSchema(BaseModel):
+    id: int
+    status: str
+    price: float
+    items: list[OrderProductSchema]
+
+    class Config:
+        from_attributes = True

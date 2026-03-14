@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from models import Order, User, Product
 from sqlalchemy.orm import Session
 from dependencies import get_session, verify_token
-from schemas import orderSchema, OrderProductSchema
+from schemas import orderSchema, OrderProductSchema, ResponseOrderSchema
 
 order_router  = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(verify_token)])
 
@@ -105,3 +105,45 @@ async def remove_product_from_order(product_id: int,
         "quantity": len(order.items),
         "order": order.items,
     }
+
+
+@order_router.post("/order/finished/{order_id}")
+
+async def finished_order(order_id: int, session: Session = Depends(get_session), user: User = Depends(verify_token)):
+    order = session.query(Order).filter(Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not user.admin and user.id != order.user:
+        raise HTTPException(status_code=403, detail="You do not have permission to cancel this order")
+
+    order.status = "Finished"
+    session.commit()
+
+    return {
+        "message": f"Order finished successfully for order id: {order.id}",
+        "order": order
+      }
+
+@order_router.get("/order/{order_id}")
+
+async def get_order(order_id: int, session: Session = Depends(get_session), user: User = Depends(verify_token)):
+    order = session.query(Order).filter(Order.id == order_id).first()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if not user.admin and user.id != order.user:
+        raise HTTPException(status_code=403, detail="You do not have permission to view this order")
+
+    return {
+        "quantity": len(order.items),
+        "order": order
+    }
+
+@order_router.get("/list_order/order_user", response_model=list[ResponseOrderSchema])
+
+async def list_orders_by_user(session: Session = Depends(get_session), user: User = Depends(verify_token)):
+    orders = session.query(Order).filter(Order.user == user.id).all()
+    return orders
