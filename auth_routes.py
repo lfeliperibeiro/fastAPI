@@ -43,6 +43,8 @@ async def signup(user_schema: userSchema, session: Session = Depends(get_session
     if user:
         raise HTTPException(status_code=400, detail="Email already registered")
     else:
+        if user_schema.password != user_schema.confirm_password:
+            raise HTTPException(status_code=400, detail="Passwords do not match")
         password = bcrypt_context.hash(user_schema.password)
         new_user = User(user_schema.name, user_schema.email, password, user_schema.admin, user_schema.active)
         session.add(new_user)

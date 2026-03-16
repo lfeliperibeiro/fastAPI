@@ -5,6 +5,7 @@ class userSchema(BaseModel):
   name: str
   email: str
   password: str
+  confirm_password: str
   active: Optional[bool]
   admin: Optional[bool]
 
