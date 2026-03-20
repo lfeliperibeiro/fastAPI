@@ -1,8 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from models import Order, User, Product
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from dependencies import get_session, verify_token
-from schemas import orderSchema, OrderProductSchema, ResponseOrderSchema
+from schemas import (
+    orderSchema,
+    OrderProductSchema,
+    ResponseOrderSchema,
+    OrdersListResponseSchema,
+    OrdersListProductsResponseSchema,
+)
 
 order_router  = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(verify_token)])
 
@@ -16,7 +22,7 @@ async def orders():
 @order_router.post("/order")
 
 async def create_order(order_schema: orderSchema, session: Session = Depends(get_session)):
-    new_order = Order(user=order_schema.user_id)
+    new_order = Order(user_id=order_schema.user_id)
     session.add(new_order)
     session.commit()
     return {"message": f"Order created successfully for order id: {order_schema.user_id}"}
@@ -30,7 +36,7 @@ async def cancel_order(order_id: int, session: Session = Depends(get_session), u
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if not user.admin and user.id != order.user:
+    if not user.admin and user.id != order.user_id:
         raise HTTPException(status_code=403, detail="You do not have permission to cancel this order")
 
     order.status = "Cancelled"
@@ -41,14 +47,23 @@ async def cancel_order(order_id: int, session: Session = Depends(get_session), u
         "order": order
       }
 
-@order_router.get("list")
+@order_router.get("/list", response_model=OrdersListResponseSchema)
 
 async def list_orders(session: Session = Depends(get_session), user: User = Depends(verify_token)):
     if not user.admin:
         raise HTTPException(status_code=403, detail="You do not have permission to view the list of orders")
     else:
-        orders = session.query(Order).all()
+        orders = session.query(Order).options(joinedload(Order.user)).all()
         return {"orders": orders}
+
+@order_router.get("/list_products", response_model=OrdersListProductsResponseSchema)
+
+async def list_products(session: Session = Depends(get_session), user: User = Depends(verify_token)):
+    if not user.admin:
+        raise HTTPException(status_code=403, detail="You do not have permission to view the list of products")
+    else:
+        products = session.query(Product).all()
+        return {"products": products}
 
 
 @order_router.post("/order/add_product/{order_id}")
@@ -61,7 +76,7 @@ async def add_product_to_order(order_id: int,
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    if not user.admin and user.id != order.user:
+    if not user.admin and user.id != order.user_id:
         raise HTTPException(status_code=403, detail="You do not have permission to add products to this order")
     product = Product(name=product_schema.name,
                       price=product_schema.price,
@@ -93,7 +108,7 @@ async def remove_product_from_order(product_id: int,
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if not user.admin and user.id != order.user:
+    if not user.admin and user.id != order.user_id:
         raise HTTPException(status_code=403, detail="You do not have permission to remove products from this order")
 
     session.delete(product)
@@ -115,7 +130,7 @@ async def finished_order(order_id: int, session: Session = Depends(get_session),
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if not user.admin and user.id != order.user:
+    if not user.admin and user.id != order.user_id:
         raise HTTPException(status_code=403, detail="You do not have permission to cancel this order")
 
     order.status = "Finished"
@@ -134,7 +149,7 @@ async def get_order(order_id: int, session: Session = Depends(get_session), user
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    if not user.admin and user.id != order.user:
+    if not user.admin and user.id != order.user_id:
         raise HTTPException(status_code=403, detail="You do not have permission to view this order")
 
     return {
@@ -145,5 +160,10 @@ async def get_order(order_id: int, session: Session = Depends(get_session), user
 @order_router.get("/list_order/order_user", response_model=list[ResponseOrderSchema])
 
 async def list_orders_by_user(session: Session = Depends(get_session), user: User = Depends(verify_token)):
-    orders = session.query(Order).filter(Order.user == user.id).all()
+    orders = (
+        session.query(Order)
+        .options(joinedload(Order.user))
+        .filter(Order.user_id == user.id)
+        .all()
+    )
     return orders

@@ -22,23 +22,31 @@ class User(Base):
         self.active = active
         self.admin = admin
 
+    orders = relationship("Order", back_populates="user")
+
 class Order(Base):
     __tablename__ = "orders"
 
-    # ORDER_STATUS = (
-    #     ("Pending", "Pending"),
-    #     ("Cancelled", "Cancelled"),
-    #     ("Completed", "Completed"),
-    # )
+    ORDER_STATUS = (
+        ("Pending", "Pending"),
+        ("Cancelled", "Cancelled"),
+        ("Completed", "Completed"),
+    )
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     status = Column("status", String)
-    user = Column("user", ForeignKey("users.id"))
+    user_id = Column("user", Integer, ForeignKey("users.id"))
+    user = relationship("User", back_populates="orders")
     price = Column("price", Float)
     items = relationship("Product", cascade="all, delete")
 
-    def __init__(self, user: int, status: str = "Pending", price: float = 0):
-        self.user = user
+    @property
+    def user_name(self) -> str | None:
+        # Expose the related user's name for API responses.
+        return self.user.name if self.user is not None else None
+
+    def __init__(self, user_id: int, status: str = "Pending", price: float = 0):
+        self.user_id = user_id
         self.status = status
         self.price = price
 

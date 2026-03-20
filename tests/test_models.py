@@ -16,8 +16,8 @@ def test_user_model_initialization():
 
 def test_order_model_initialization():
     """Creating an Order should set fields and allow different statuses."""
-    o = models.Order(user=42, status="Completed", price=12.50)
-    assert o.user == 42
+    o = models.Order(user_id=42, status="Completed", price=12.50)
+    assert o.user_id == 42
     assert o.status == "Completed"
     assert o.price == 12.50
 
