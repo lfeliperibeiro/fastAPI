@@ -10,12 +10,24 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 auth_router  = APIRouter(prefix="/auth", tags=["auth"])
 
-def create_token(user_id: str, duration= timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)):
+def create_token(
+    user_id: str,
+    *,
+    admin: bool = False,
+    duration: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+):
     expiration_date = datetime.now(timezone.utc) + duration
-    info_dict = {"sub": str(user_id), "exp": expiration_date}
+    info_dict = {
+        "sub": str(user_id),
+        "exp": expiration_date,
+        "admin": bool(admin),
+    }
     encoding_jwt = jwt.encode(info_dict, SECRET_KEY, algorithm=ALGORITHM)
-    token = encoding_jwt
-    return token
+    return encoding_jwt
+
+
+def _user_is_admin(user: User) -> bool:
+    return bool(user.admin) if user.admin is not None else False
 
 
 
@@ -58,8 +70,10 @@ async def login(login_schema: loginSchema, session: Session = Depends(get_sessio
     if not user:
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     else:
-        access_token = create_token(user.id)
-        refresh_token = create_token(user.id, timedelta(days=7))
+        access_token = create_token(user.id, admin=_user_is_admin(user))
+        refresh_token = create_token(
+            user.id, admin=_user_is_admin(user), duration=timedelta(days=7)
+        )
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 
 
@@ -69,14 +83,14 @@ async def login_test(form_data: OAuth2PasswordRequestForm = Depends(), session: 
     if not user:
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     else:
-        access_token = create_token(user.id)
+        access_token = create_token(user.id, admin=_user_is_admin(user))
         return {"access_token": access_token, "token_type": "Bearer"}
 
 
 @auth_router.post("/refresh")
 
 async def use_refresh_token(user: User = Depends(verify_token)):
-    access_token = create_token(user.id)
+    access_token = create_token(user.id, admin=_user_is_admin(user))
 
     return {"access_token": access_token, "token_type": "Bearer"}
 

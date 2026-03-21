@@ -35,8 +35,9 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login-test")
 
 from auth_routes import auth_router
 from order_routes import order_router
+from users_routes import users_router
 
 app.include_router(auth_router)
 app.include_router(order_router)
-
+app.include_router(users_router)
 

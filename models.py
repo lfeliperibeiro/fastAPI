@@ -1,4 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, Boolean, Float, ForeignKey
+from datetime import datetime, timezone
+
+from sqlalchemy import create_engine, Column, DateTime, Integer, String, Boolean, Float, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 # from sqlalchemy_utils.types import ChoiceType
 
@@ -38,6 +40,7 @@ class Order(Base):
     user_id = Column("user", Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="orders")
     price = Column("price", Float)
+    created_at = Column("created_at", DateTime, default=lambda: datetime.now(timezone.utc))
     items = relationship("Product", cascade="all, delete")
 
     @property
@@ -49,6 +52,7 @@ class Order(Base):
         self.user_id = user_id
         self.status = status
         self.price = price
+        self.created_at = datetime.now(timezone.utc)
 
     def calculate_price(self):
         self.price = sum(item.price * item.quantity for item in self.items)

@@ -25,7 +25,12 @@ async def create_order(order_schema: orderSchema, session: Session = Depends(get
     new_order = Order(user_id=order_schema.user_id)
     session.add(new_order)
     session.commit()
-    return {"message": f"Order created successfully for order id: {order_schema.user_id}"}
+    session.refresh(new_order)
+    return {
+        "message": f"Order created successfully for order id: {new_order.id}",
+        "order_id": new_order.id,
+        "created_at": new_order.created_at.isoformat() if new_order.created_at else None,
+    }
 
 
 @order_router.post("/order/cancel/{order_id}")
