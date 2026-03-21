@@ -4,10 +4,8 @@ from sqlalchemy.orm import Session, joinedload
 from dependencies import get_session, verify_token
 from schemas import (
     orderSchema,
-    OrderProductSchema,
     ProductCreateSchema,
     ResponseOrderSchema,
-    OrdersListResponseSchema,
     OrdersListProductsResponseSchema,
 )
 
@@ -72,7 +70,6 @@ async def edit_order(
     if not user.admin and user.id != order.user_id:
         raise HTTPException(status_code=403, detail="You do not have permission to edit this order")
 
-    # Unlink current products from this order before applying new items.
     current_products = session.query(Product).filter(Product.order == order.id).all()
     for current in current_products:
         current.order = None

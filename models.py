@@ -2,7 +2,6 @@ from datetime import datetime, timezone
 
 from sqlalchemy import create_engine, Column, DateTime, Integer, String, Boolean, Float, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
-# from sqlalchemy_utils.types import ChoiceType
 
 db = create_engine("sqlite:///database.db")
 
@@ -45,7 +44,6 @@ class Order(Base):
 
     @property
     def user_name(self) -> str | None:
-        # Expose the related user's name for API responses.
         return self.user.name if self.user is not None else None
 
     def __init__(self, user_id: int, status: str = "Pending", price: float = 0):
