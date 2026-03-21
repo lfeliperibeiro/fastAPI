@@ -31,8 +31,17 @@ class UsersListResponseSchema(BaseModel):
   class Config:
     from_attributes = True
 
+class OrderItemInputSchema(BaseModel):
+  product_id: int
+  quantity: int
+
+  class Config:
+    from_attributes = True
+
+
 class orderSchema(BaseModel):
   user_id: int
+  products: list[OrderItemInputSchema]
 
   class Config:
     from_attributes = True
@@ -55,6 +64,25 @@ class OrderProductSchema(BaseModel):
 
       class Config:
           from_attributes = True
+
+
+class ProductListSchema(BaseModel):
+    id: int
+    name: str
+    price: float
+    size: str
+
+    class Config:
+        from_attributes = True
+
+
+class ProductCreateSchema(BaseModel):
+    name: str
+    price: float
+    size: str
+
+    class Config:
+        from_attributes = True
 
 class ResponseUserSchema(BaseModel):
     name: str
@@ -83,7 +111,7 @@ class OrdersListResponseSchema(BaseModel):
         from_attributes = True
 
 class OrdersListProductsResponseSchema(BaseModel):
-    products: list[OrderProductSchema]
+    products: list[ProductListSchema]
 
     class Config:
         from_attributes = True

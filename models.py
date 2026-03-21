@@ -4,7 +4,7 @@ from sqlalchemy import create_engine, Column, DateTime, Integer, String, Boolean
 from sqlalchemy.orm import declarative_base, relationship
 # from sqlalchemy_utils.types import ChoiceType
 
-db = create_engine("sqlite:///banco.db")
+db = create_engine("sqlite:///database.db")
 
 Base = declarative_base()
 
@@ -68,7 +68,14 @@ class Product(Base):
     price = Column("price", Float)
     order = Column("order", ForeignKey("orders.id"))
 
-    def __init__(self, name: str, price: float, quantity: int, size: str, order: int):
+    def __init__(
+        self,
+        name: str,
+        price: float,
+        quantity: int = 1,
+        size: str = "",
+        order: int | None = None,
+    ):
         self.name = name
         self.price = price
         self.quantity = quantity

@@ -47,7 +47,7 @@ Edite `.env` e defina pelo menos:
 
 ### 4) Migre o banco de dados (SQLite)
 
-O projeto usa SQLite (`banco.db` por padrão).
+O projeto usa SQLite (`database.db` por padrão).
 
 ```bash
 alembic upgrade head
