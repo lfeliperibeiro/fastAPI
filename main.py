@@ -36,7 +36,7 @@ class BcryptContext:
         return bcrypt.checkpw(pwd_bytes, hashed_password.encode('utf-8'))
 
 bcrypt_context = BcryptContext()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login-test")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 from auth_routes import auth_router
 from order_routes import order_router

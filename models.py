@@ -1,9 +1,11 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 from sqlalchemy import create_engine, Column, DateTime, Integer, String, Boolean, Float, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship
 
-db = create_engine("sqlite:///database.db")
+_db_path = Path(__file__).resolve().parent / "database.db"
+db = create_engine(f"sqlite:///{_db_path}")
 
 Base = declarative_base()
 
@@ -41,16 +43,20 @@ class Order(Base):
     price = Column("price", Float)
     created_at = Column("created_at", DateTime, default=lambda: datetime.now(timezone.utc))
     items = relationship("Product", cascade="all, delete")
+    notes = Column("notes", String, nullable=True)
+    payment_method = Column("payment_method", String, nullable=True)
 
     @property
     def user_name(self) -> str | None:
         return self.user.name if self.user is not None else None
 
-    def __init__(self, user_id: int, status: str = "Pending", price: float = 0):
+    def __init__(self, user_id: int, status: str = "Pending", price: float = 0, notes: str = None, payment_method: str = None):
         self.user_id = user_id
         self.status = status
         self.price = price
         self.created_at = datetime.now(timezone.utc)
+        self.notes = notes
+        self.payment_method = payment_method
 
     def calculate_price(self):
         self.price = sum(item.price * item.quantity for item in self.items)

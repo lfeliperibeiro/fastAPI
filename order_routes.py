@@ -6,7 +6,8 @@ from schemas import (
     orderSchema,
     ProductCreateSchema,
     ResponseOrderSchema,
-    OrdersListProductsResponseSchema,
+    AdminOrderResponseSchema,
+    OrderProductSummarySchema,
 )
 
 order_router  = APIRouter(prefix="/orders", tags=["orders"], dependencies=[Depends(verify_token)])
@@ -24,7 +25,11 @@ async def create_order(order_schema: orderSchema, session: Session = Depends(get
     if not order_schema.products:
         raise HTTPException(status_code=400, detail="At least one product is required")
 
-    new_order = Order(user_id=order_schema.user_id)
+    new_order = Order(
+        user_id=order_schema.user_id,
+        notes=order_schema.notes,
+        payment_method=order_schema.payment_method,
+    )
     session.add(new_order)
     session.flush()
 
@@ -48,7 +53,10 @@ async def create_order(order_schema: orderSchema, session: Session = Depends(get
         "order_id": new_order.id,
         "products": linked_products,
         "total_price": new_order.price,
+        "status": new_order.status,
         "created_at": new_order.created_at.isoformat() if new_order.created_at else None,
+        "notes": new_order.notes,
+        "payment_method": new_order.payment_method,
     }
 
 
@@ -87,6 +95,8 @@ async def edit_order(
         linked_products.append({"product_id": product.id, "quantity": product.quantity})
 
     order.user_id = order_schema.user_id
+    order.notes = order_schema.notes
+    order.payment_method = order_schema.payment_method
     order.calculate_price()
 
     session.commit()
@@ -96,7 +106,10 @@ async def edit_order(
         "order_id": order.id,
         "products": linked_products,
         "total_price": order.price,
+        "status": order.status,
         "created_at": order.created_at.isoformat() if order.created_at else None,
+        "notes": order.notes,
+        "payment_method": order.payment_method,
     }
 
 
@@ -116,17 +129,21 @@ async def cancel_order(order_id: int, session: Session = Depends(get_session), u
 
     return {
         "message": f"Order cancelled successfully for order id: {order.id}",
-        "order": order
-      }
+        "order_id": order.id,
+        "status": order.status,
+    }
 
-@order_router.get("/list", response_model=OrdersListProductsResponseSchema)
+@order_router.get("/list", response_model=list[OrderProductSummarySchema])
 
 async def list_orders(session: Session = Depends(get_session), user: User = Depends(verify_token)):
     if not user.admin:
         raise HTTPException(status_code=403, detail="You do not have permission to view the list of orders")
-    else:
-        products = session.query(Product).all()
-        return {"products": products}
+
+    products = session.query(Product).all()
+    return [
+        {"product_id": p.id, "name": p.name, "price": p.price, "size": p.size}
+        for p in products
+    ]
 
 
 @order_router.post("/order/add_product")
@@ -183,8 +200,9 @@ async def finished_order(order_id: int, session: Session = Depends(get_session),
 
     return {
         "message": f"Order finished successfully for order id: {order.id}",
-        "order": order
-      }
+        "order_id": order.id,
+        "status": order.status,
+    }
 
 @order_router.get("/order/{order_id}")
 
@@ -202,13 +220,24 @@ async def get_order(order_id: int, session: Session = Depends(get_session), user
         "order": order
     }
 
-@order_router.get("/list_order/order_user", response_model=list[ResponseOrderSchema])
+@order_router.get("/list_order/order_user", response_model=list[AdminOrderResponseSchema])
 
 async def list_orders_by_user(session: Session = Depends(get_session), user: User = Depends(verify_token)):
     orders = (
         session.query(Order)
-        .options(joinedload(Order.user))
+        .options(joinedload(Order.items))
         .filter(Order.user_id == user.id)
         .all()
     )
-    return orders
+    return [
+        {
+            "order_id": order.id,
+            "products": [{"product_id": p.id, "quantity": p.quantity} for p in order.items],
+            "total_price": order.price,
+            "status": order.status,
+            "created_at": order.created_at,
+            "notes": order.notes,
+            "payment_method": order.payment_method,
+        }
+        for order in orders
+    ]

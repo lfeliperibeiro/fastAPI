@@ -42,6 +42,8 @@ class OrderItemInputSchema(BaseModel):
 class orderSchema(BaseModel):
   user_id: int
   products: list[OrderItemInputSchema]
+  notes: Optional[str] = None
+  payment_method: Optional[str] = None
 
   class Config:
     from_attributes = True
@@ -128,6 +130,44 @@ class OrdersListResponseSchema(BaseModel):
 
 class OrdersListProductsResponseSchema(BaseModel):
     products: list[ProductListSchema]
+
+    class Config:
+        from_attributes = True
+
+
+class OrderListProductItemSchema(BaseModel):
+    product_id: int
+    quantity: int
+
+    class Config:
+        from_attributes = True
+
+
+class AdminOrderResponseSchema(BaseModel):
+    order_id: int
+    products: list[OrderListProductItemSchema]
+    total_price: float
+    status: Optional[str] = None
+    created_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    payment_method: Optional[str] = None
+
+
+class OrderProductSummarySchema(BaseModel):
+    product_id: int
+    name: str
+    price: float
+    size: str
+
+    class Config:
+        from_attributes = True
+
+
+class AdminOrderListSchema(BaseModel):
+    products: list[OrderProductSummarySchema]
+
+    class Config:
+        from_attributes = True
 
     class Config:
         from_attributes = True
