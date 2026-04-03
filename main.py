@@ -1,11 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
+from pathlib import Path
+
 from dotenv import load_dotenv
 import os
 import bcrypt
 
-load_dotenv()
+_root = Path(__file__).resolve().parent
+# Base vinda do .env.example; o .env sobrescreve (e pode não existir no clone do repo).
+load_dotenv(_root / ".env.example")
+load_dotenv(_root / ".env", override=True)
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")

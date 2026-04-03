@@ -55,6 +55,22 @@ class loginSchema(BaseModel):
     from_attributes = True
 
 
+class ForgotPasswordSchema(BaseModel):
+  email: str
+
+  class Config:
+    from_attributes = True
+
+
+class ResetPasswordSchema(BaseModel):
+  token: str
+  password: str
+  confirm_password: str
+
+  class Config:
+    from_attributes = True
+
+
 class OrderProductSchema(BaseModel):
       id: int
       name: str

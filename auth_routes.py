@@ -1,14 +1,26 @@
-from fastapi import APIRouter, Depends, HTTPException
-from models import User
-from dependencies import get_session, verify_token
-from main import bcrypt_context, ALGORITHM, SECRET_KEY, ACCESS_TOKEN_EXPIRE_MINUTES
-from schemas import userSchema, loginSchema
-from sqlalchemy.orm import Session
-from jose import JWTError, jwt
+import os
 from datetime import datetime, timedelta, timezone
-from fastapi.security import OAuth2PasswordRequestForm
 
-auth_router  = APIRouter(prefix="/auth", tags=["auth"])
+from fastapi import APIRouter, Depends, HTTPException
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+
+from dependencies import get_session, verify_token
+from email_service import send_password_reset_email
+from main import (
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    ALGORITHM,
+    SECRET_KEY,
+    bcrypt_context,
+)
+from models import User
+from schemas import (
+    ForgotPasswordSchema,
+    ResetPasswordSchema,
+    loginSchema,
+    userSchema,
+)
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 def create_token(
     user_id: str,
@@ -24,6 +36,34 @@ def create_token(
     }
     encoding_jwt = jwt.encode(info_dict, SECRET_KEY, algorithm=ALGORITHM)
     return encoding_jwt
+
+
+def _password_reset_expire() -> timedelta:
+    minutes = int(os.getenv("PASSWORD_RESET_TOKEN_EXPIRE_MINUTES", "30"))
+    return timedelta(minutes=minutes)
+
+
+def create_password_reset_token(user_id: int) -> str:
+    expiration_date = datetime.now(timezone.utc) + _password_reset_expire()
+    payload = {
+        "sub": str(user_id),
+        "exp": expiration_date,
+        "purpose": "password_reset",
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_password_reset_token(token: str) -> int:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose") != "password_reset":
+            raise JWTError()
+        return int(payload["sub"])
+    except JWTError:
+        raise HTTPException(
+            status_code=400,
+            detail="Token de recuperação inválido ou expirado",
+        ) from None
 
 
 def _user_is_admin(user: User) -> bool:
@@ -77,15 +117,42 @@ async def login(login_schema: loginSchema, session: Session = Depends(get_sessio
         return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
 
 
-@auth_router.post("/login-test")
-async def login_test(form_data: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
-    user = user_authentication(form_data.username, form_data.password, session)
-    if not user:
-        raise HTTPException(status_code=400, detail="user not found or invalid credentials")
-    else:
-        access_token = create_token(user.id, admin=_user_is_admin(user))
-        return {"access_token": access_token, "token_type": "Bearer"}
+@auth_router.post("/forgot-password")
+async def forgot_password(
+    body: ForgotPasswordSchema,
+    session: Session = Depends(get_session),
+):
+    user = session.query(User).filter(User.email == body.email).first()
+    if user:
+        token = create_password_reset_token(user.id)
+        try:
+            send_password_reset_email(user.email, token, user.name)
+        except RuntimeError as e:
+            raise HTTPException(status_code=503, detail=str(e)) from e
+        except OSError:
+            raise HTTPException(
+                status_code=502,
+                detail="Não foi possível enviar o e-mail. Verifique SMTP_HOST e credenciais.",
+            ) from None
+    return {
+        "message": "Se o e-mail estiver cadastrado, você receberá instruções em breve.",
+    }
 
+
+@auth_router.post("/reset-password")
+async def reset_password(
+    body: ResetPasswordSchema,
+    session: Session = Depends(get_session),
+):
+    if body.password != body.confirm_password:
+        raise HTTPException(status_code=400, detail="As senhas não coincidem")
+    user_id = decode_password_reset_token(body.token)
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Usuário não encontrado")
+    user.password = bcrypt_context.hash(body.password)
+    session.commit()
+    return {"message": "Senha redefinida com sucesso"}
 
 @auth_router.post("/refresh")
 
