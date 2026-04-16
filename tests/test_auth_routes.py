@@ -241,4 +241,7 @@ def test_logout_returns_success(anon_client):
     response = anon_client.post("/auth/logout")
     assert response.status_code == 200
     assert response.json() == {"message": "Logout realizado"}
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert any("access_token" in h and "Max-Age=0" in h for h in set_cookie_headers)
+    assert any("refresh_token" in h and "Max-Age=0" in h for h in set_cookie_headers)
     anon_client.cookies.clear()
