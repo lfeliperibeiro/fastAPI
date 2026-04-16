@@ -76,10 +76,9 @@ def test_login_success(anon_client, db_session):
     payload = {"email": "login@example.com", "password": "mypassword"}
     response = anon_client.post("/auth/login", json=payload)
     assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "Bearer"
+    assert response.json() == {"message": "Login realizado com sucesso"}
+    assert "access_token" in response.cookies
+    assert "refresh_token" in response.cookies
 
 
 def test_login_wrong_password(anon_client, db_session):
