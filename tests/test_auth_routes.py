@@ -123,28 +123,30 @@ def test_token_endpoint_invalid(anon_client):
 # POST /auth/refresh
 # ---------------------------------------------------------------------------
 
-def test_refresh_token(db_session):
-    """Refresh com access_token cookie válido deve devolver novo access_token."""
+def test_refresh_token(anon_client, db_session):
+    """Refresh com refresh_token cookie válido deve definir novo access_token cookie."""
     user = _make_user(db_session, email="refresh@example.com")
-    token = create_token(user.id, duration=timedelta(minutes=30))
-
-    from dependencies import get_session
-    app.dependency_overrides[get_session] = lambda: (yield db_session)
-    client = TestClient(app)
-    client.cookies.set("access_token", token)
-
-    response = client.post("/auth/refresh")
+    refresh_tok = create_token(user.id, duration=timedelta(days=7))
+    anon_client.cookies.set("refresh_token", refresh_tok)
+    response = anon_client.post("/auth/refresh")
     assert response.status_code == 200
-    assert "access_token" in response.json()
-
-    app.dependency_overrides.clear()
+    assert response.json() == {"message": "Token renovado"}
+    assert "access_token" in response.cookies
+    anon_client.cookies.clear()
 
 
 def test_refresh_token_invalid(anon_client):
-    anon_client.cookies.set("access_token", "invalidtoken")
+    anon_client.cookies.set("refresh_token", "invalidtoken")
     response = anon_client.post("/auth/refresh")
     assert response.status_code == 401
     anon_client.cookies.clear()
+
+
+def test_refresh_token_missing(anon_client):
+    """Sem cookie refresh_token deve retornar 401."""
+    response = anon_client.post("/auth/refresh")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
 
 
 # ---------------------------------------------------------------------------

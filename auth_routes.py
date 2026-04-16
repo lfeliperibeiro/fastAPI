@@ -1,12 +1,12 @@
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from dependencies import get_session, verify_token
+from dependencies import get_session
 from email_service import send_password_reset_email
 from main import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -198,9 +198,30 @@ async def reset_password(
     return {"message": "Senha redefinida com sucesso"}
 
 @auth_router.post("/refresh")
-
-async def use_refresh_token(user: User = Depends(verify_token)):
+async def use_refresh_token(
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+):
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        dict_info = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(dict_info.get("sub"))
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
     access_token = create_token(user.id, admin=_user_is_admin(user))
-
-    return {"access_token": access_token, "token_type": "Bearer"}
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    return {"message": "Token renovado"}
 
