@@ -105,13 +105,31 @@ async def signup(user_schema: userSchema, session: Session = Depends(get_session
         return {"message": f"User created successfully {user_schema.email}"}
 
 @auth_router.post("/token")
-async def login_form(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+async def login_form(form: OAuth2PasswordRequestForm = Depends(), response: Response = None, session: Session = Depends(get_session)):
     user = user_authentication(form.username, form.password, session)
     if not user:
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     access_token = create_token(user.id, admin=_user_is_admin(user))
-    refresh_token = create_token(user.id, admin=_user_is_admin(user), duration=timedelta(days=7))
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    refresh_token = create_token(
+        user.id, admin=_user_is_admin(user), duration=timedelta(days=7)
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=7 * 24 * 3600,
+    )
+    return {"message": "Login realizado com sucesso"}
 
 
 @auth_router.post("/login")

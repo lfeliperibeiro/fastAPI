@@ -106,7 +106,9 @@ def test_token_endpoint_success(anon_client, db_session):
         data={"username": "token@example.com", "password": "tokenpass"},
     )
     assert response.status_code == 200
-    assert "access_token" in response.json()
+    assert response.json() == {"message": "Login realizado com sucesso"}
+    assert "access_token" in response.cookies
+    assert "refresh_token" in response.cookies
 
 
 def test_token_endpoint_invalid(anon_client):
