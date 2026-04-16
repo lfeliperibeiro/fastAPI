@@ -1,12 +1,12 @@
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-from dependencies import get_session, verify_token
+from dependencies import get_session
 from email_service import send_password_reset_email
 from main import (
     ACCESS_TOKEN_EXPIRE_MINUTES,
@@ -28,6 +28,7 @@ def create_token(
     *,
     admin: bool = False,
     duration: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    purpose: str | None = None,
 ):
     expiration_date = datetime.now(timezone.utc) + duration
     info_dict = {
@@ -35,6 +36,8 @@ def create_token(
         "exp": expiration_date,
         "admin": bool(admin),
     }
+    if purpose:
+        info_dict["purpose"] = purpose
     encoding_jwt = jwt.encode(info_dict, SECRET_KEY, algorithm=ALGORITHM)
     return encoding_jwt
 
@@ -105,27 +108,59 @@ async def signup(user_schema: userSchema, session: Session = Depends(get_session
         return {"message": f"User created successfully {user_schema.email}"}
 
 @auth_router.post("/token")
-async def login_form(form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
+async def login_form(response: Response, form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = user_authentication(form.username, form.password, session)
     if not user:
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     access_token = create_token(user.id, admin=_user_is_admin(user))
-    refresh_token = create_token(user.id, admin=_user_is_admin(user), duration=timedelta(days=7))
-    return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "bearer"}
+    refresh_token = create_token(
+        user.id, admin=_user_is_admin(user), duration=timedelta(days=7), purpose="refresh"
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=7 * 24 * 3600,
+    )
+    return {"message": "Login realizado com sucesso"}
 
 
 @auth_router.post("/login")
-
-async def login(login_schema: loginSchema, session: Session = Depends(get_session)):
+async def login(login_schema: loginSchema, response: Response, session: Session = Depends(get_session)):
     user = user_authentication(login_schema.email, login_schema.password, session)
     if not user:
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
-    else:
-        access_token = create_token(user.id, admin=_user_is_admin(user))
-        refresh_token = create_token(
-            user.id, admin=_user_is_admin(user), duration=timedelta(days=7)
-        )
-        return {"access_token": access_token, "refresh_token": refresh_token, "token_type": "Bearer"}
+    access_token = create_token(user.id, admin=_user_is_admin(user))
+    refresh_token = create_token(
+        user.id, admin=_user_is_admin(user), duration=timedelta(days=7), purpose="refresh"
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=7 * 24 * 3600,
+    )
+    return {"message": "Login realizado com sucesso"}
 
 
 @auth_router.post("/forgot-password")
@@ -166,9 +201,38 @@ async def reset_password(
     return {"message": "Senha redefinida com sucesso"}
 
 @auth_router.post("/refresh")
-
-async def use_refresh_token(user: User = Depends(verify_token)):
+async def use_refresh_token(
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+):
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        dict_info = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(dict_info.get("sub"))
+        if dict_info.get("purpose") != "refresh":
+            raise JWTError()
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = session.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
     access_token = create_token(user.id, admin=_user_is_admin(user))
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    return {"message": "Token renovado"}
 
-    return {"access_token": access_token, "token_type": "Bearer"}
 
+@auth_router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token", httponly=True, samesite="lax")
+    response.delete_cookie("refresh_token", httponly=True, samesite="lax")
+    return {"message": "Logout realizado"}

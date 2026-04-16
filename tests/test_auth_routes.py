@@ -76,10 +76,9 @@ def test_login_success(anon_client, db_session):
     payload = {"email": "login@example.com", "password": "mypassword"}
     response = anon_client.post("/auth/login", json=payload)
     assert response.status_code == 200
-    data = response.json()
-    assert "access_token" in data
-    assert "refresh_token" in data
-    assert data["token_type"] == "Bearer"
+    assert response.json() == {"message": "Login realizado com sucesso"}
+    assert "access_token" in response.cookies
+    assert "refresh_token" in response.cookies
 
 
 def test_login_wrong_password(anon_client, db_session):
@@ -107,7 +106,9 @@ def test_token_endpoint_success(anon_client, db_session):
         data={"username": "token@example.com", "password": "tokenpass"},
     )
     assert response.status_code == 200
-    assert "access_token" in response.json()
+    assert response.json() == {"message": "Login realizado com sucesso"}
+    assert "access_token" in response.cookies
+    assert "refresh_token" in response.cookies
 
 
 def test_token_endpoint_invalid(anon_client):
@@ -122,25 +123,30 @@ def test_token_endpoint_invalid(anon_client):
 # POST /auth/refresh
 # ---------------------------------------------------------------------------
 
-def test_refresh_token(db_session):
-    """Refresh com token válido deve devolver novo access_token."""
+def test_refresh_token(anon_client, db_session):
+    """Refresh com refresh_token cookie válido deve definir novo access_token cookie."""
     user = _make_user(db_session, email="refresh@example.com")
-    token = create_token(user.id, duration=timedelta(minutes=30))
-
-    from dependencies import get_session
-    app.dependency_overrides[get_session] = lambda: (yield db_session)
-    client = TestClient(app)
-
-    response = client.post("/auth/refresh", headers={"Authorization": f"Bearer {token}"})
+    refresh_tok = create_token(user.id, duration=timedelta(days=7), purpose="refresh")
+    anon_client.cookies.set("refresh_token", refresh_tok)
+    response = anon_client.post("/auth/refresh")
     assert response.status_code == 200
-    assert "access_token" in response.json()
-
-    app.dependency_overrides.clear()
+    assert response.json() == {"message": "Token renovado"}
+    assert "access_token" in response.cookies
+    anon_client.cookies.clear()
 
 
 def test_refresh_token_invalid(anon_client):
-    response = anon_client.post("/auth/refresh", headers={"Authorization": "Bearer invalidtoken"})
+    anon_client.cookies.set("refresh_token", "invalidtoken")
+    response = anon_client.post("/auth/refresh")
     assert response.status_code == 401
+    anon_client.cookies.clear()
+
+
+def test_refresh_token_missing(anon_client):
+    """Sem cookie refresh_token deve retornar 401."""
+    response = anon_client.post("/auth/refresh")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
 
 
 # ---------------------------------------------------------------------------
@@ -201,3 +207,41 @@ def test_reset_password_invalid_token(anon_client):
         json={"token": "badtoken", "password": "abc123", "confirm_password": "abc123"},
     )
     assert response.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# verify_token via cookie
+# ---------------------------------------------------------------------------
+
+def test_verify_token_missing_cookie_returns_401(anon_client):
+    """Rota protegida sem cookie deve retornar 401."""
+    response = anon_client.get("/users/users")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+def test_verify_token_valid_cookie_passes(anon_client, db_session):
+    """Rota protegida com cookie access_token válido deve retornar 200."""
+    user = _make_user(db_session, email="cookieuser@example.com")
+    token = create_token(user.id)
+    anon_client.cookies.set("access_token", token)
+    response = anon_client.get("/users/users")
+    assert response.status_code == 200
+    anon_client.cookies.clear()
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/logout
+# ---------------------------------------------------------------------------
+
+def test_logout_returns_success(anon_client):
+    """Logout deve retornar 200 e limpar os cookies."""
+    anon_client.cookies.set("access_token", "sometoken")
+    anon_client.cookies.set("refresh_token", "somerefresh")
+    response = anon_client.post("/auth/logout")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Logout realizado"}
+    set_cookie_headers = response.headers.get_list("set-cookie")
+    assert any("access_token" in h and "Max-Age=0" in h for h in set_cookie_headers)
+    assert any("refresh_token" in h and "Max-Age=0" in h for h in set_cookie_headers)
+    anon_client.cookies.clear()
