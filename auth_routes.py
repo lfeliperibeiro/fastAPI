@@ -230,3 +230,9 @@ async def use_refresh_token(
     )
     return {"message": "Token renovado"}
 
+
+@auth_router.post("/logout")
+async def logout(response: Response):
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+    return {"message": "Logout realizado"}

@@ -228,3 +228,17 @@ def test_verify_token_valid_cookie_passes(anon_client, db_session):
     response = anon_client.get("/users/users")
     assert response.status_code == 200
     anon_client.cookies.clear()
+
+
+# ---------------------------------------------------------------------------
+# POST /auth/logout
+# ---------------------------------------------------------------------------
+
+def test_logout_returns_success(anon_client):
+    """Logout deve retornar 200 e limpar os cookies."""
+    anon_client.cookies.set("access_token", "sometoken")
+    anon_client.cookies.set("refresh_token", "somerefresh")
+    response = anon_client.post("/auth/logout")
+    assert response.status_code == 200
+    assert response.json() == {"message": "Logout realizado"}
+    anon_client.cookies.clear()
