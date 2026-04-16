@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.security import OAuth2PasswordBearer
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -8,7 +7,6 @@ import os
 import bcrypt
 
 _root = Path(__file__).resolve().parent
-# Base vinda do .env.example; o .env sobrescreve (e pode não existir no clone do repo).
 load_dotenv(_root / ".env.example")
 load_dotenv(_root / ".env", override=True)
 
@@ -20,7 +18,7 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -36,7 +34,6 @@ class BcryptContext:
         return bcrypt.checkpw(pwd_bytes, hashed_password.encode('utf-8'))
 
 bcrypt_context = BcryptContext()
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/token")
 
 from auth_routes import auth_router
 from order_routes import order_router
@@ -45,4 +42,3 @@ from users_routes import users_router
 app.include_router(auth_router)
 app.include_router(order_router)
 app.include_router(users_router)
-

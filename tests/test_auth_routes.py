@@ -201,3 +201,24 @@ def test_reset_password_invalid_token(anon_client):
         json={"token": "badtoken", "password": "abc123", "confirm_password": "abc123"},
     )
     assert response.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# verify_token via cookie
+# ---------------------------------------------------------------------------
+
+def test_verify_token_missing_cookie_returns_401(anon_client):
+    """Rota protegida sem cookie deve retornar 401."""
+    response = anon_client.get("/users/users")
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Not authenticated"
+
+
+def test_verify_token_valid_cookie_passes(anon_client, db_session):
+    """Rota protegida com cookie access_token válido deve retornar 200."""
+    user = _make_user(db_session, email="cookieuser@example.com")
+    token = create_token(user.id)
+    anon_client.cookies.set("access_token", token)
+    response = anon_client.get("/users/users")
+    assert response.status_code == 200
+    anon_client.cookies.clear()
