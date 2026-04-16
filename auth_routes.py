@@ -28,6 +28,7 @@ def create_token(
     *,
     admin: bool = False,
     duration: timedelta = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    purpose: str | None = None,
 ):
     expiration_date = datetime.now(timezone.utc) + duration
     info_dict = {
@@ -35,6 +36,8 @@ def create_token(
         "exp": expiration_date,
         "admin": bool(admin),
     }
+    if purpose:
+        info_dict["purpose"] = purpose
     encoding_jwt = jwt.encode(info_dict, SECRET_KEY, algorithm=ALGORITHM)
     return encoding_jwt
 
@@ -111,7 +114,7 @@ async def login_form(response: Response, form: OAuth2PasswordRequestForm = Depen
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     access_token = create_token(user.id, admin=_user_is_admin(user))
     refresh_token = create_token(
-        user.id, admin=_user_is_admin(user), duration=timedelta(days=7)
+        user.id, admin=_user_is_admin(user), duration=timedelta(days=7), purpose="refresh"
     )
     response.set_cookie(
         key="access_token",
@@ -139,7 +142,7 @@ async def login(login_schema: loginSchema, response: Response, session: Session 
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
     access_token = create_token(user.id, admin=_user_is_admin(user))
     refresh_token = create_token(
-        user.id, admin=_user_is_admin(user), duration=timedelta(days=7)
+        user.id, admin=_user_is_admin(user), duration=timedelta(days=7), purpose="refresh"
     )
     response.set_cookie(
         key="access_token",
@@ -209,6 +212,8 @@ async def use_refresh_token(
     try:
         dict_info = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(dict_info.get("sub"))
+        if dict_info.get("purpose") != "refresh":
+            raise JWTError()
     except JWTError:
         raise HTTPException(status_code=401, detail="Invalid token")
     user = session.query(User).filter(User.id == user_id).first()

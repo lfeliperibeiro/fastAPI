@@ -126,7 +126,7 @@ def test_token_endpoint_invalid(anon_client):
 def test_refresh_token(anon_client, db_session):
     """Refresh com refresh_token cookie válido deve definir novo access_token cookie."""
     user = _make_user(db_session, email="refresh@example.com")
-    refresh_tok = create_token(user.id, duration=timedelta(days=7))
+    refresh_tok = create_token(user.id, duration=timedelta(days=7), purpose="refresh")
     anon_client.cookies.set("refresh_token", refresh_tok)
     response = anon_client.post("/auth/refresh")
     assert response.status_code == 200
