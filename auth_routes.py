@@ -105,7 +105,7 @@ async def signup(user_schema: userSchema, session: Session = Depends(get_session
         return {"message": f"User created successfully {user_schema.email}"}
 
 @auth_router.post("/token")
-async def login_form(form: OAuth2PasswordRequestForm = Depends(), response: Response = None, session: Session = Depends(get_session)):
+async def login_form(response: Response, form: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(get_session)):
     user = user_authentication(form.username, form.password, session)
     if not user:
         raise HTTPException(status_code=400, detail="user not found or invalid credentials")
