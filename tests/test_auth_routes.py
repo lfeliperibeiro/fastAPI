@@ -123,15 +123,16 @@ def test_token_endpoint_invalid(anon_client):
 # ---------------------------------------------------------------------------
 
 def test_refresh_token(db_session):
-    """Refresh com token válido deve devolver novo access_token."""
+    """Refresh com access_token cookie válido deve devolver novo access_token."""
     user = _make_user(db_session, email="refresh@example.com")
     token = create_token(user.id, duration=timedelta(minutes=30))
 
     from dependencies import get_session
     app.dependency_overrides[get_session] = lambda: (yield db_session)
     client = TestClient(app)
+    client.cookies.set("access_token", token)
 
-    response = client.post("/auth/refresh", headers={"Authorization": f"Bearer {token}"})
+    response = client.post("/auth/refresh")
     assert response.status_code == 200
     assert "access_token" in response.json()
 
@@ -139,8 +140,10 @@ def test_refresh_token(db_session):
 
 
 def test_refresh_token_invalid(anon_client):
-    response = anon_client.post("/auth/refresh", headers={"Authorization": "Bearer invalidtoken"})
+    anon_client.cookies.set("access_token", "invalidtoken")
+    response = anon_client.post("/auth/refresh")
     assert response.status_code == 401
+    anon_client.cookies.clear()
 
 
 # ---------------------------------------------------------------------------

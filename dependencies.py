@@ -8,8 +8,8 @@ from main import SECRET_KEY, ALGORITHM
 
 def get_session():
     try:
-        Session = sessionmaker(bind=db)
-        session = Session()
+        SessionFactory = sessionmaker(bind=db)
+        session = SessionFactory()
         yield session
     finally:
         session.close()
